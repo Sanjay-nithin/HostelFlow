@@ -37,9 +37,10 @@ const Login = () => {
         description: 'You have been logged in successfully.',
       });
       
-      // Redirect based on user role
       if (userData.is_superuser) {
         navigate('/admin');
+      } else if (userData.is_serviceprovider) {
+        navigate('/service-provider');
       } else {
         navigate('/');
       }

@@ -1,16 +1,15 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authAPI, getAuthToken, setAuthToken, removeAuthToken } from '@/services/api';
+import { authAPI, getAuthToken, setAuthToken, removeAuthToken, serviceProviderAPI } from '@/services/api';
 
 interface User {
-  is_superuser: any;
   id: string;
   email: string;
-  username: string;
+  name: string;
   room_number: string;
-  is_staff?: boolean;
-  is_admin?: boolean;
+  is_superuser?: boolean;
   is_serviceprovider?: boolean;
+  service_provider_id?: string;
 }
 
 interface AuthContextType {
@@ -47,7 +46,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUser = async () => {
     try {
       const userData = await authAPI.getProfile();
-      console.log(userData);
+      
+      // Check if user is a service provider
+      if (userData.is_serviceprovider) {
+        try {
+          const providerData = await serviceProviderAPI.getProfile();
+          userData.service_provider_id = providerData.id;
+        } catch (error) {
+          console.error('Failed to load service provider data:', error);
+        }
+      }
+      
       setUser(userData);
     } catch (error) {
       console.error('Failed to load user:', error);
@@ -60,13 +69,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const response = await authAPI.login({ email, password });
     setAuthToken(response.access_token);
-    await loadUser();
+    
+    // Check if user is a service provider
+    if (response.user.is_serviceprovider) {
+      try {
+        const providerData = await serviceProviderAPI.getProfile();
+        response.user.service_provider_id = providerData.id;
+      } catch (error) {
+        console.error('Failed to load service provider data:', error);
+      }
+    }
+    
+    setUser(response.user);
   };
 
   const register = async (userData: { email: string; password: string; name: string; room_number: string }) => {
     const response = await authAPI.register(userData);
     setAuthToken(response.access_token);
-    await loadUser();
+    setUser(response.user);
   };
 
   const logout = () => {

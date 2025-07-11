@@ -89,6 +89,14 @@ export const bookingsAPI = {
     apiRequest(`/bookings/${bookingId}/delete`, {
       method: 'DELETE',
     }),
+
+  getAssignedBookings: () => apiRequest('/bookings/assigned'),
+
+  updateBookingStatus: (bookingId: string, status: string) =>
+    apiRequest(`/bookings/${bookingId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
 };
 
 // Admin API calls
@@ -120,7 +128,48 @@ export const adminAPI = {
     }),
 };
 
+export const serviceProviderAPI = {
+  getProfile: () => apiRequest('/service-provider/profile'),
+  
+  getAssignedBookings: () => apiRequest('/service-provider/bookings'),
+  
+  updateBookingStatus: (bookingId: string, status: 'in_progress' | 'completed') =>
+    apiRequest(`/service-provider/bookings/${bookingId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  
+  getNotifications: () => apiRequest('/service-provider/notifications'),
+  
+  markNotificationRead: (notificationId: string) =>
+    apiRequest(`/service-provider/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    }),
+  
+  sendCompletionNotification: (bookingId: string, message: string) =>
+    apiRequest(`/service-provider/bookings/${bookingId}/notify-completion`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+};
+
+// Notifications API calls  
+export const notificationsAPI = {
+  getUserNotifications: () => apiRequest('/notifications/user'),
+  
+  markAsRead: (notificationId: string) =>
+    apiRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    }),
+  
+  sendBookingNotification: (bookingId: string) =>
+    apiRequest(`/notifications/booking/${bookingId}`, {
+      method: 'POST',
+    }),
+};
+
 // Stats API calls
 export const statsAPI = {
   getDashboard: () => apiRequest('/stats/dashboard'),
+  getServiceProviderStats: () => apiRequest('/stats/service-provider'),
 };

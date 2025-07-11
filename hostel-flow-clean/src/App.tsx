@@ -12,6 +12,7 @@ import CategoryServices from "./pages/CategoryServices";
 import BookingForm from "./pages/BookingForm";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ServiceProviderDashboard from "./pages/ServiceProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,8 @@ const AppRoutes = () => {
     if (!isLoading && user) {
       if (user.is_superuser) {
         navigate('/admin');
+      }else if (user.is_serviceprovider) {
+        navigate('/service-provider')
       }
       // optional: you could auto-redirect normal users to "/" here
     }
@@ -42,6 +45,7 @@ const AppRoutes = () => {
           <AdminDashboard />
         </AdminRoute>
       } />
+      <Route path="/service-provider" element={<ServiceProviderDashboard />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
