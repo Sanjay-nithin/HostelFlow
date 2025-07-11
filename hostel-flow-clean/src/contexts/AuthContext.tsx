@@ -3,11 +3,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { authAPI, getAuthToken, setAuthToken, removeAuthToken } from '@/services/api';
 
 interface User {
+  is_superuser: any;
   id: string;
   email: string;
   username: string;
   room_number: string;
   is_staff?: boolean;
+  is_admin?: boolean;
+  is_serviceprovider?: boolean;
 }
 
 interface AuthContextType {
@@ -44,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUser = async () => {
     try {
       const userData = await authAPI.getProfile();
+      console.log(userData);
       setUser(userData);
     } catch (error) {
       console.error('Failed to load user:', error);
@@ -56,13 +60,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const response = await authAPI.login({ email, password });
     setAuthToken(response.access_token);
-    setUser(response.user);
+    await loadUser();
   };
 
   const register = async (userData: { email: string; password: string; name: string; room_number: string }) => {
     const response = await authAPI.register(userData);
     setAuthToken(response.access_token);
-    setUser(response.user);
+    await loadUser();
   };
 
   const logout = () => {

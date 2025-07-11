@@ -46,6 +46,7 @@ class LoginView(APIView):
                 'user': profile.data,
                 'access_token': tokens['access'],
             }, status=200)
+        print(serializer)
         return Response(serializer.errors, status=400)
 
 
@@ -202,15 +203,95 @@ def get_service_providers(request):
     serializer = ServiceProviderSerializer(providers, many=True)
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 def create_service_provider(request):
-    serializer = ServiceProviderSerializer(data=request.data)
-    print(serializer)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    predefined_services = {
+        1: 'Laundry',
+        2: 'Room Cleaning',
+        3: 'Study Spaces',
+        4: 'Room Repairs',
+        5: 'Tech Support',
+        6: 'AI Booking Assistant'
+    }
+
+    name = request.data.get('name')
+    email = request.data.get('email')
+    phone = request.data.get('phone')
+    specialization = request.data.get('specialization')
+    service_ids = request.data.get('services', [])
+
+    if not name or not email:
+        return Response({'error': 'Name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    default_password = "serviceprovider"
+    user = User.objects.create_user(
+        username=name,
+        email=email,
+        password=default_password
+    )
+    user.is_serviceprovider = True
+    user.save()
+
+    service_provider = ServiceProvider.objects.create(
+        name=user.username,
+        email=user.email,
+        phone=phone,
+        specialization=specialization
+    )
+
+    new_services = []
+    created_services = []
+
+    for sid in service_ids:
+        service_name = predefined_services.get(sid)
+        if service_name:
+            service, created = Service.objects.get_or_create(
+                name=service_name,
+                defaults={
+                    'description': get_default_description(service_name),
+                    'price': 100.00,
+                    'duration': '2 hours',
+                    'rating': 0.0,
+                    'availability': True,
+                    'provider_name': name
+                }
+            )
+            created_services.append(service.id)
+            if created:
+                new_services.append(ServiceSerializer(service).data)
+            else:
+                # optionally update provider_name if needed
+                service.provider_name = name
+                service.save()
+
+    service_provider.services.set(created_services)
+
+    response_data = {
+        'service_provider': {
+            'id': service_provider.id,
+            'user_id': user.id,
+            'name': name,
+            'email': email
+        },
+        'newly_created_services': new_services
+    }
+
+    return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+def get_default_description(service_name):
+    descriptions = {
+        'Laundry': "Professional laundry services including washing, drying, and ironing.",
+        'Room Cleaning': "Complete room cleaning with dusting, mopping, and sanitization.",
+        'Study Spaces': "Well-maintained study spaces for focused and quiet study sessions.",
+        'Room Repairs': "On-demand maintenance and repair services for hostel rooms.",
+        'Tech Support': "Technical assistance for your devices, connectivity, and software.",
+        'AI Booking Assistant': "Smart AI-powered assistant to help you schedule services easily."
+    }
+    return descriptions.get(service_name, "General service provided by the hostel.")
+
 
 @api_view(['PUT'])
 @permission_classes([IsAdminUser])

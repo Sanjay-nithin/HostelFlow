@@ -32,15 +32,24 @@ class LoginSerializer(serializers.Serializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    is_serviceprovider = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'room_number', 'is_superuser')
+        fields = ('id', 'email', 'username', 'room_number', 'is_superuser', 'is_serviceprovider')
+
+    def get_is_serviceprovider(self, obj):
+        return ServiceProvider.objects.filter(user=obj).exists()
+
+    def get_is_admin(self, obj):
+        return obj.is_superuser
+
 
 
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ['id', 'name', 'description', 'price', 'duration', 'rating', 'availability']
+        fields = ['id', 'name', 'description', 'price', 'duration', 'rating', 'availability', 'provider_name']
 
 class ServiceProviderSerializer(serializers.ModelSerializer):
     services = ServiceSerializer(many=True, read_only=True)
@@ -53,7 +62,7 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ServiceProvider
-        fields = ['id', 'name', 'email', 'phone', 'specialization', 'services', 'service_ids']
+        fields = ['id', 'user', 'name', 'email', 'phone', 'specialization', 'services', 'service_ids']
 
 
 class BookingSerializer(serializers.ModelSerializer):
