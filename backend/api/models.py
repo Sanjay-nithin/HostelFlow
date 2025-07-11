@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    name = models.CharField(max_length=100)
-    room_number = models.CharField(max_length=10)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    room_number = models.CharField(max_length=10, blank=True, null=True)
     is_serviceprovider = models.BooleanField(default=False)
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username'] 
@@ -60,7 +60,25 @@ class ServiceProvider(models.Model):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=15)
     specialization = models.CharField(max_length=100)
-    services = models.ManyToManyField('Service', related_name='providers')
-
+    
     def __str__(self):
         return self.name
+    
+class ServiceProviderService(models.Model):
+    serviceprovider = models.ForeignKey(ServiceProvider, on_delete=models.CASCADE, related_name='service_links')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='provider_links')
+
+    class Meta:
+        unique_together = ('serviceprovider', 'service')
+
+    def __str__(self):
+        return f"{self.serviceprovider.name} offers {self.service.name}"
+
+class Notification(models.Model):
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'Notification for {self.user.username}: {self.message[:30]}'

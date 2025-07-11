@@ -27,7 +27,7 @@ const AdminDashboard = () => {
     queryKey: ['admin', 'service-providers'],
     queryFn: adminAPI.getServiceProviders,
   });
-
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -46,7 +46,7 @@ const AdminDashboard = () => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
-
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
       <Header />
@@ -172,7 +172,9 @@ const AdminDashboard = () => {
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.room_number}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary">Student</Badge>
+                          <Badge variant="secondary">
+                            {user.is_serviceprovider ? 'Service Provider' : 'Student'}
+                          </Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -212,7 +214,6 @@ const AdminDashboard = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Specialization</TableHead>
-                        <TableHead>Services</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -222,20 +223,7 @@ const AdminDashboard = () => {
                           <TableCell>{provider.email}</TableCell>
                           <TableCell>{provider.phone}</TableCell>
                           <TableCell>{provider.specialization}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {provider.services?.slice(0, 2).map((service: any, index: number) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {service.name}
-                                </Badge>
-                              ))}
-                              {provider.services?.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{provider.services.length - 2} more
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
+                          
                         </TableRow>
                       ))}
                     </TableBody>

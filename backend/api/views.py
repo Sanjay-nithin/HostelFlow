@@ -69,20 +69,39 @@ class ServiceListView(APIView):
             return Response({'error': str(e)}, status=500)
 
 
+from django.db import IntegrityError
+
 class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        try:
-            serializer = BookingSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(user=request.user)
-                return Response(serializer.data, status=201)
-            else:
-                return Response(serializer.errors, status=400)
+        serializer = BookingSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                print("request", request.data)
+                booking = serializer.save(user=request.user)
+                # Send notification to service providers
+                service = booking.service
+                service_providers = service.provider_links.all()
+                for sp_link in service_providers:
+                    service_provider = sp_link.serviceprovider
+                    Notification.objects.create(
+                        user=service_provider.user,
+                        message=f'New booking for {service.name} on {booking.date} at {booking.time_slot}.'
+                    )
 
-        except Exception as e:
-            print(e)
+
+                return Response(serializer.data, status=201)
+
+            except IntegrityError:
+                return Response(
+                    {'error': 'This time slot is already booked for the selected service. Please choose another slot.'},
+                    status=400
+                )
+        else:
+            print(serializer.errors)
+            return Response(serializer.errors, status=400)
+
 
 
 class MyBookingsView(APIView):
@@ -145,6 +164,13 @@ class RateBookingView(APIView):
             return Response({'message': 'Rating submitted'})
         return Response(serializer.errors, status=400)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_notifications(request):
+    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    print(notifications)
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data)
 
 
 @api_view(['GET'])
@@ -199,10 +225,9 @@ def get_all_users(request):
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def get_service_providers(request):
-    providers = ServiceProvider.objects.prefetch_related('services').all()
+    providers = ServiceProvider.objects.prefetch_related('service_links__service').all()
     serializer = ServiceProviderSerializer(providers, many=True)
     return Response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
@@ -235,6 +260,7 @@ def create_service_provider(request):
     user.save()
 
     service_provider = ServiceProvider.objects.create(
+        user=user,
         name=user.username,
         email=user.email,
         phone=phone,
@@ -266,7 +292,10 @@ def create_service_provider(request):
                 service.provider_name = name
                 service.save()
 
-    service_provider.services.set(created_services)
+            ServiceProviderService.objects.create(
+                serviceprovider=service_provider,
+                service=service,
+            )
 
     response_data = {
         'service_provider': {
@@ -318,4 +347,153 @@ def delete_service_provider(request, provider_id):
     provider.delete()
     return Response({"detail": "Provider deleted."}, status=status.HTTP_204_NO_CONTENT)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def service_provider_profile(request):
+    if not request.user.is_serviceprovider:
+        return Response({'error': 'Not a service provider'}, status=403)
+    print("Request", request.data)
+    profile = ServiceProvider.objects.filter(user=request.user).first()
+    if not profile:
+        return Response({'error': 'Service provider profile not found'}, status=404)
+    
+    data = {
+        'id': profile.id,
+        'user': {
+            'id': request.user.id,
+            'email': request.user.email,
+            'username': request.user.username,
+        },
+        # optionally add specialization, phone, services etc.
+    }
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_assigned_bookings(request):
+    if not getattr(request.user, 'is_serviceprovider', False):
+        return Response({'error': 'Not a service provider'}, status=403)
+
+    try:
+        service_provider = request.user.provider_profile 
+        service_ids = service_provider.service_links.values_list('service_id', flat=True)
+        bookings = Booking.objects.filter(service_id__in=service_ids)
+
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)
+
+    except AttributeError:
+        return Response({'error': 'No service provider profile found.'}, status=400)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_booking_status(request, booking_id):
+    if not request.user.is_serviceprovider:
+        return Response({'error': 'Not a service provider'}, status=403)
+    
+    status_value = request.data.get('status')
+    if status_value not in ['in_progress', 'completed']:
+        return Response({'error': 'Invalid status'}, status=400)
+    
+    try:
+        booking = Booking.objects.get(id=booking_id, service__in=request.user.serviceprovider.services.all())
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=404)
+    
+    booking.status = status_value
+    booking.save()
+    return Response({'message': 'Status updated'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_completion_notification(request, booking_id):
+    if not request.user.is_serviceprovider:
+        return Response({'error': 'Not a service provider'}, status=403)
+    
+    message = request.data.get('message', 'Service completed')
+    try:
+        booking = Booking.objects.get(id=booking_id, service__in=request.user.serviceprovider.services.all())
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=404)
+    
+    # Assuming you have a Notification model
+    Notification.objects.create(
+        user=booking.user,
+        message=message
+    )
+    return Response({'message': 'Notification sent'})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_service_provider_notifications(request):
+    if not getattr(request.user, 'is_serviceprovider', False):
+        return Response({'error': 'Not a service provider'}, status=403)
+
+    notifications = Notification.objects.filter(user=request.user)
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data)  # empty list [] if no notifications
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def mark_service_provider_notification_read(request, notification_id):
+    try:
+        notif = Notification.objects.get(id=notification_id, user=request.user)
+        notif.read = True
+        notif.save()
+        return Response({'message': 'Marked as read'})
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=404)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_notifications(request):
+    notifications = Notification.objects.filter(user=request.user)
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    try:
+        notification = Notification.objects.get(id=notification_id, user=request.user)
+        notification.read = True
+        notification.save()
+        print(notification.user)
+        if notification.user:
+            try:
+                from .models import Booking 
+                booking = Booking.objects.get(email=notification.user)
+                # create a new notification for the booking user
+                Notification.objects.create(
+                    user=booking.user,
+                    message="Booking successfully submitted",
+                    read=False
+                )
+            except Booking.DoesNotExist:
+                pass  # optionally log or handle this case
+
+        return Response({'status': 'marked as read'})
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=404)
+
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_booking_notification(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=404)
+    
+    Notification.objects.create(
+        user=booking.user,
+        message='Booking update notification'
+    )
+    return Response({'message': 'Notification sent'})
 

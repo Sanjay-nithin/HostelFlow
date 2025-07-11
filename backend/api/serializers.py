@@ -42,18 +42,33 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = ['id', 'name', 'description', 'price', 'duration', 'rating', 'availability', 'provider_name']
 
+class ServiceProviderServiceSerializer(serializers.ModelSerializer):
+    service = ServiceSerializer(read_only=True)  # nested service details
+
+    class Meta:
+        model = ServiceProviderService
+        fields = ['id', 'service', 'price', 'rating', 'availability']
+
 class ServiceProviderSerializer(serializers.ModelSerializer):
-    services = ServiceSerializer(many=True, read_only=True)
+    offered_services = ServiceProviderServiceSerializer(
+        many=True,
+        read_only=True,
+        source='serviceproviderservice_set'  # default related_name
+    )
+    
+    # Keep service_ids to accept list of services when creating/updating
     service_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Service.objects.all(),
-        write_only=True,
-        source='services'
+        write_only=True
     )
 
     class Meta:
         model = ServiceProvider
-        fields = ['id', 'user', 'name', 'email', 'phone', 'specialization', 'services', 'service_ids']
+        fields = [
+            'id', 'user', 'name', 'email', 'phone', 'specialization',
+            'offered_services', 'service_ids'
+        ]
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -87,6 +102,12 @@ class BookingRateSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'name', 'username', 'room_number', 'is_superuser']
+        fields = ['id', 'email', 'name', 'username', 'room_number', 'is_superuser', 'is_serviceprovider']
 
 
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'created_at', 'read']

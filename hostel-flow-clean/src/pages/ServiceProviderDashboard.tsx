@@ -1,4 +1,4 @@
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,} from '@/components/ui/dialog';  
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,11 @@ import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface Booking {
-  _id: string;
-  service_name: string;
-  user_name: string;
+  id: string;
+  service: {
+    name:string;
+  };
+  provider_name: string;
   room_number: string;
   date: string;
   time_slot: string;
@@ -25,7 +27,7 @@ interface Booking {
 }
 
 interface Notification {
-  _id: string;
+  id: string;
   message: string;
   booking_id: string;
   read: boolean;
@@ -36,6 +38,9 @@ const ServiceProviderDashboard = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
   const [stats, setStats] = useState({
     pending: 0,
     in_progress: 0,
@@ -52,12 +57,10 @@ const ServiceProviderDashboard = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [bookingsData, notificationsData, statsData] = await Promise.all([
+      const [bookingsData, notificationsData] = await Promise.all([
         serviceProviderAPI.getAssignedBookings(),
         serviceProviderAPI.getNotifications(),
-        serviceProviderAPI.getProfile(), // Mock stats for now
       ]);
-
       setBookings(bookingsData);
       setNotifications(notificationsData);
       
@@ -116,7 +119,7 @@ const ServiceProviderDashboard = () => {
     try {
       await serviceProviderAPI.markNotificationRead(notificationId);
       setNotifications(prev => 
-        prev.map(n => n._id === notificationId ? { ...n, read: true } : n)
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
@@ -151,7 +154,7 @@ const ServiceProviderDashboard = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-        <Header />
+        <Header hideNotifications />
         
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
@@ -247,11 +250,11 @@ const ServiceProviderDashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {bookings.map((booking) => (
-                        <TableRow key={booking._id}>
+                        <TableRow key={booking.id}>
                           <TableCell className="font-medium">
-                            {booking.service_name}
+                            {booking.service.name}
                           </TableCell>
-                          <TableCell>{booking.user_name}</TableCell>
+                          <TableCell>{booking.provider_name}</TableCell>
                           <TableCell>{booking.room_number}</TableCell>
                           <TableCell>{formatDate(booking.date)}</TableCell>
                           <TableCell>{booking.time_slot}</TableCell>
@@ -265,7 +268,7 @@ const ServiceProviderDashboard = () => {
                               {booking.status === 'confirmed' && (
                                 <Button
                                   size="sm"
-                                  onClick={() => updateBookingStatus(booking._id, 'in_progress')}
+                                  onClick={() => updateBookingStatus(booking.id, 'in_progress')}
                                   className="bg-yellow-600 hover:bg-yellow-700"
                                 >
                                   Start
@@ -274,7 +277,7 @@ const ServiceProviderDashboard = () => {
                               {booking.status === 'in_progress' && (
                                 <Button
                                   size="sm"
-                                  onClick={() => updateBookingStatus(booking._id, 'completed')}
+                                  onClick={() => updateBookingStatus(booking.id, 'completed')}
                                   className="bg-green-600 hover:bg-green-700"
                                 >
                                   Complete
@@ -305,13 +308,16 @@ const ServiceProviderDashboard = () => {
                     ) : (
                       notifications.map((notification) => (
                         <div
-                          key={notification._id}
+                          key={notification.id}
                           className={`p-4 rounded-lg border ${
                             notification.read 
                               ? 'bg-gray-50 border-gray-200' 
                               : 'bg-blue-50 border-blue-200'
                           }`}
-                          onClick={() => !notification.read && markNotificationRead(notification._id)}
+                          onClick={() => {
+                            setSelectedNotification(notification);
+                            setIsModalOpen(true);
+                          }}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -334,6 +340,26 @@ const ServiceProviderDashboard = () => {
               </Card>
             </TabsContent>
           </Tabs>
+          <Dialog open={isModalOpen} onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open && selectedNotification && !selectedNotification.read) {
+                // Mark as read once closed
+                markNotificationRead(selectedNotification.id);
+            }
+            }}>
+            <DialogContent>
+                <DialogHeader>
+                <DialogTitle>Notification</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2">
+                <p className="text-gray-800">{selectedNotification?.message}</p>
+                <p className="text-xs text-gray-500">
+                    {selectedNotification && new Date(selectedNotification.created_at).toLocaleString()}
+                </p>
+                </div>
+            </DialogContent>
+            </Dialog>
+
         </div>
       </div>
     </ProtectedRoute>

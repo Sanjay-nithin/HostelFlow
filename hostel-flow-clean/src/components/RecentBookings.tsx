@@ -13,7 +13,7 @@ const RecentBookings = () => {
   const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<any>(null);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
   const deleteBooking = useDeleteBooking();
-
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -70,7 +70,7 @@ const RecentBookings = () => {
             bookings?.map((booking: any) => (
               <div key={booking.id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors duration-200">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-800">{booking.service.name}</h4>
+                  <h4 className="font-medium text-gray-800">{booking.service ? booking.service.name : 'Unknown Serivces'}</h4>
                   <Badge className={getStatusColor(booking.status)}>
                     {booking.status.replace('_', ' ')}
                   </Badge>

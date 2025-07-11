@@ -66,6 +66,14 @@ export const servicesAPI = {
     apiRequest(`/bookings/availability?service_id=${serviceId}&date=${date}`)
 };
 
+export const studentAPI = {
+  getNotifications: () => apiRequest('/student/notifications'),
+  markNotificationRead: (notificationId: string) =>
+    apiRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    }),
+};
+
 // Bookings API calls
 export const bookingsAPI = {
   getMyBookings: () => apiRequest('/bookings/my'),
